@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Driver Management</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f1f5f9;
+        margin: 0;
+        padding: 35px 20px;
+        color: #1e293b;
+      }
+      .container {
+        max-width: 900px;
+        margin: auto;
+      }
+      .card {
+        background: white;
+        padding: 25px;
+        margin-bottom: 22px;
+        border-radius: 12px;
+        box-shadow: 0 3px 12px #0000000d;
+      }
+      h1,
+      h2 {
+        color: #17365d;
+      }
+      label {
+        display: block;
+        margin: 14px 0 6px;
+        font-weight: bold;
+      }
+      input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 11px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+      }
+      button {
+        margin-top: 18px;
+        padding: 11px 18px;
+        background: #17365d;
+        color: white;
+        border: 0;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 12px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+      }
+      th {
+        background: #f8fafc;
+      }
+      .error {
+        color: #b91c1c;
+        font-size: 14px;
+      }
+      .success {
+        color: #166534;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Driver Management</h1>
+      <p>Register drivers and view the current driver list.</p>
+
+      <div class="card">
+        <h2>Add a Driver</h2>
+
+        <p
+          class="success"
+          th:if="${successMessage}"
+          th:text="${successMessage}"
+        ></p>
+
+        <form th:action="@{/drivers}" th:object="${driver}" method="post">
+          <label for="name">Driver Name</label>
+          <input
+            id="name"
+            type="text"
+            th:field="*{name}"
+            placeholder="Enter driver's name"
+            required
+          />
+          <p class="error" th:errors="*{name}"></p>
+
+          <label for="phone">Phone Number</label>
+          <input
+            id="phone"
+            type="tel"
+            th:field="*{phone}"
+            maxlength="10"
+            pattern="[0-9]{10}"
+            placeholder="10-digit phone number"
+            required
+          />
+          <p class="error" th:errors="*{phone}"></p>
+
+          <button type="submit">Add Driver</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Registered Drivers</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Availability</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr th:each="d : ${drivers}">
+                <td th:text="${d.id}"></td>
+                <td th:text="${d.name}"></td>
+                <td th:text="${d.phone}"></td>
+                <td th:text="${d.available ? 'Available' : 'Unavailable'}"></td>
+              </tr>
+              <tr th:if="${#lists.isEmpty(drivers)}">
+                <td colspan="4">No drivers registered yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p><a th:href="@{/}">Back to Home</a></p>
+    </div>
+  </body>
+</html>

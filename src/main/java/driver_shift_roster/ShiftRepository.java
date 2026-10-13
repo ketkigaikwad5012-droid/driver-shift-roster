@@ -1,0 +1,16 @@
+
+package driver_shift_roster;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface ShiftRepository extends JpaRepository<Shift, Long> {
+
+    boolean existsByDriverIdAndShiftDateAndStartTimeLessThanAndEndTimeGreaterThan(
+            Long driverId,
+            LocalDate shiftDate,
+            LocalTime endTime,
+            LocalTime startTime);
+}
