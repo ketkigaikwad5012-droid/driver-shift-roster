@@ -26,7 +26,6 @@ public class ShiftController {
 
     @GetMapping("/shifts")
     public String listShifts(Model model) {
-
         model.addAttribute("shifts", shiftRepository.findAll());
         model.addAttribute("drivers", driverRepository.findAll());
         model.addAttribute("shift", new Shift());
@@ -43,7 +42,7 @@ public class ShiftController {
             @RequestParam LocalTime endTime,
             RedirectAttributes redirectAttributes) {
 
-        // Step 1: Validate the time range
+        // Validate the time range
         if (!endTime.isAfter(startTime)) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
@@ -51,11 +50,19 @@ public class ShiftController {
             return "redirect:/shifts";
         }
 
-        // Step 2: Find the selected driver
+        // Prevent scheduling shifts in the past
+        if (shiftDate.isBefore(LocalDate.now())) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "Shift date cannot be in the past.");
+            return "redirect:/shifts";
+        }
+
+        // Find the selected driver
         Driver driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new IllegalArgumentException("Driver not found"));
 
-        // Step 3: Check driver availability
+        // Check driver availability
         if (!driver.isAvailable()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
@@ -63,7 +70,7 @@ public class ShiftController {
             return "redirect:/shifts";
         }
 
-        // Step 4: Check for overlapping shifts
+        // Check for overlapping shifts
         boolean overlappingShift = shiftRepository
                 .existsByDriverIdAndShiftDateAndStartTimeLessThanAndEndTimeGreaterThan(
                         driverId,
@@ -78,17 +85,16 @@ public class ShiftController {
             return "redirect:/shifts";
         }
 
-        // Step 5: Create the new shift
+        // Create and save the shift
         Shift shift = new Shift();
         shift.setDriver(driver);
         shift.setShiftDate(shiftDate);
         shift.setStartTime(startTime);
         shift.setEndTime(endTime);
 
-        // Step 6: Save the shift in MySQL
         shiftRepository.save(shift);
 
-        // Step 7: Show the success message
+        // Show the success message
         redirectAttributes.addFlashAttribute(
                 "successMessage",
                 "Shift scheduled successfully!");
