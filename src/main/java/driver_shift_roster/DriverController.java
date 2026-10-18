@@ -6,6 +6,7 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -35,7 +36,8 @@ public class DriverController {
             RedirectAttributes redirectAttributes) {
 
         if (driverRepository.existsByPhone(driver.getPhone())) {
-            result.rejectValue("phone", "duplicate",
+            result.rejectValue(
+                    "phone", "duplicate",
                     "This phone number is already registered");
         }
 
@@ -47,6 +49,31 @@ public class DriverController {
         driverRepository.save(driver);
         redirectAttributes.addFlashAttribute(
                 "successMessage", "Driver added successfully!");
+
+        return "redirect:/drivers";
+    }
+
+    @PostMapping("/drivers/{id}/availability")
+    public String toggleAvailability(
+            @PathVariable Long id,
+            RedirectAttributes redirectAttributes) {
+
+        Driver driver = driverRepository.findById(id).orElse(null);
+
+        if (driver == null) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage", "Driver not found.");
+            return "redirect:/drivers";
+        }
+
+        driver.setAvailable(!driver.isAvailable());
+        driverRepository.save(driver);
+
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                driver.isAvailable()
+                        ? "Driver marked as available."
+                        : "Driver marked as unavailable.");
 
         return "redirect:/drivers";
     }

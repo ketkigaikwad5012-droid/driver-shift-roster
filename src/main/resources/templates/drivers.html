@@ -2,23 +2,26 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Driver Management</title>
     <style>
+      * {
+        box-sizing: border-box;
+      }
       body {
         font-family: Arial, sans-serif;
         background: #f1f5f9;
         margin: 0;
-        padding: 35px 20px;
+        padding: 30px 20px;
         color: #1e293b;
       }
       .container {
-        max-width: 900px;
+        max-width: 1000px;
         margin: auto;
       }
       .card {
         background: white;
-        padding: 25px;
+        padding: 24px;
         margin-bottom: 22px;
         border-radius: 12px;
         box-shadow: 0 3px 12px #0000000d;
@@ -33,24 +36,56 @@
         font-weight: bold;
       }
       input {
-        box-sizing: border-box;
         width: 100%;
         padding: 11px;
         border: 1px solid #cbd5e1;
         border-radius: 6px;
       }
       button {
-        margin-top: 18px;
-        padding: 11px 18px;
-        background: #17365d;
-        color: white;
-        border: 0;
+        padding: 10px 14px;
+        border: none;
         border-radius: 6px;
         cursor: pointer;
+        color: white;
+        background: #17365d;
+      }
+      .toggle {
+        margin-top: 0;
+      }
+      .available-button {
+        background: #b91c1c;
+      }
+      .unavailable-button {
+        background: #15803d;
+      }
+      .message {
+        padding: 12px;
+        border-radius: 6px;
+        margin: 12px 0;
+      }
+      .success {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .error {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .status-available {
+        color: #15803d;
+        font-weight: bold;
+      }
+      .status-unavailable {
+        color: #b91c1c;
+        font-weight: bold;
+      }
+      .table-wrap {
+        overflow-x: auto;
       }
       table {
         width: 100%;
         border-collapse: collapse;
+        min-width: 650px;
       }
       th,
       td {
@@ -61,31 +96,29 @@
       th {
         background: #f8fafc;
       }
-      .error {
-        color: #b91c1c;
-        font-size: 14px;
-      }
-      .success {
-        color: #166534;
-      }
-      .table-wrap {
-        overflow-x: auto;
+      a {
+        color: #1d4ed8;
       }
     </style>
   </head>
   <body>
     <div class="container">
       <h1>Driver Management</h1>
-      <p>Register drivers and view the current driver list.</p>
+      <p>Register drivers and manage their availability.</p>
 
       <div class="card">
         <h2>Add a Driver</h2>
 
-        <p
-          class="success"
+        <div
           th:if="${successMessage}"
+          class="message success"
           th:text="${successMessage}"
-        ></p>
+        ></div>
+        <div
+          th:if="${errorMessage}"
+          class="message error"
+          th:text="${errorMessage}"
+        ></div>
 
         <form th:action="@{/drivers}" th:object="${driver}" method="post">
           <label for="name">Driver Name</label>
@@ -124,6 +157,7 @@
                 <th>Name</th>
                 <th>Phone</th>
                 <th>Availability</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -131,17 +165,40 @@
                 <td th:text="${d.id}"></td>
                 <td th:text="${d.name}"></td>
                 <td th:text="${d.phone}"></td>
-                <td th:text="${d.available ? 'Available' : 'Unavailable'}"></td>
+                <td>
+                  <span th:if="${d.available}" class="status-available"
+                    >Available</span
+                  >
+                  <span th:unless="${d.available}" class="status-unavailable"
+                    >Unavailable</span
+                  >
+                </td>
+                <td>
+                  <form
+                    th:action="@{/drivers/{id}/availability(id=${d.id})}"
+                    method="post"
+                  >
+                    <button
+                      type="submit"
+                      class="toggle"
+                      th:classappend="${d.available} ? ' available-button' : ' unavailable-button'"
+                      th:text="${d.available} ? 'Mark Unavailable' : 'Mark Available'"
+                    ></button>
+                  </form>
+                </td>
               </tr>
               <tr th:if="${#lists.isEmpty(drivers)}">
-                <td colspan="4">No drivers registered yet.</td>
+                <td colspan="5">No drivers registered yet.</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <p><a th:href="@{/}">Back to Home</a></p>
+      <p>
+        <a th:href="@{/}">Home</a> |
+        <a th:href="@{/shifts}">Shift Scheduling</a>
+      </p>
     </div>
   </body>
 </html>
