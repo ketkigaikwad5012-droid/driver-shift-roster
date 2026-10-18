@@ -22,11 +22,20 @@ pipeline {
                                  fingerprint: true
             }
         }
+
+        stage('Prepare Deployment') {
+            steps {
+                bat '''
+                if not exist "D:\\driver-shift-roster-deploy" mkdir "D:\\driver-shift-roster-deploy"
+                copy /Y "target\\driver-shift-roster-0.0.1-SNAPSHOT.jar" "D:\\driver-shift-roster-deploy\\driver-shift-roster.jar"
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo 'Driver Shift Roster CI pipeline completed successfully.'
+            echo 'Build, tests, packaging and deployment preparation completed successfully.'
         }
         failure {
             echo 'Pipeline failed. Check the stage logs for details.'
