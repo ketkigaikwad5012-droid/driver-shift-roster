@@ -1,6 +1,7 @@
 
-import unittest
+import os
 import time
+import unittest
 from datetime import date, timedelta
 
 from selenium import webdriver
@@ -9,7 +10,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 
-import os
 
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8082")
 
@@ -21,14 +21,17 @@ class DriverRosterTests(unittest.TestCase):
         options = Options()
         options.add_argument("--start-maximized")
         cls.driver = webdriver.Chrome(options=options)
-        cls.wait = WebDriverWait(cls.driver, 10)
+        cls.wait = WebDriverWait(cls.driver, 15)
 
     @classmethod
     def tearDownClass(cls):
-        cls.driver.quit()
+        if hasattr(cls, "driver"):
+            cls.driver.quit()
 
-    def set_time(self, element_id, value):
-        """Set an HTML time input using its 24-hour value."""
+    def get_page_message(self):
+        return self.driver.find_element(By.TAG_NAME, "body").text
+
+    def set_input_value(self, element_id, value):
         element = self.wait.until(
             EC.presence_of_element_located((By.ID, element_id))
         )
@@ -40,24 +43,54 @@ class DriverRosterTests(unittest.TestCase):
             input.dispatchEvent(new Event('change', {bubbles: true}));
             """,
             element,
-            value
+            value,
+        )
+
+    def set_time(self, element_id, value):
+        self.set_input_value(element_id, value)
+
+    def submit_form_and_wait(self, form_xpath):
+        """Submit a form and wait for its redirect to finish."""
+        form = self.wait.until(
+            EC.presence_of_element_located((By.XPATH, form_xpath))
+        )
+        form.submit()
+
+        self.wait.until(EC.staleness_of(form))
+        self.wait.until(
+            EC.presence_of_element_located((By.XPATH, form_xpath))
         )
 
     def find_available_driver_id(self):
+        """Find an available driver's ID from the driver table."""
         self.driver.get(BASE_URL + "/drivers")
 
-        rows = self.wait.until(
-            EC.presence_of_all_elements_located(
-                (By.XPATH, "//tbody/tr[td]")
+        self.wait.until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//table//tbody")
             )
         )
 
+        rows = self.driver.find_elements(
+            By.XPATH, "//table//tbody/tr[td]"
+        )
+
+        # Table columns: ID, Name, Phone, Availability, Action.
         for row in rows:
             cells = row.find_elements(By.TAG_NAME, "td")
-            if len(cells) >= 5 and cells[3].text.strip() == "Available":
-                return cells[0].text.strip()
 
-        self.fail("No available driver found. Mark a driver Available first.")
+            if (
+                len(cells) >= 5
+                and cells[3].text.strip() == "Available"
+            ):
+                driver_id = cells[0].text.strip()
+                if driver_id:
+                    return driver_id
+
+        self.fail(
+            "No available driver found. Mark a driver as Available "
+            "on the Driver Management page."
+        )
 
     def fill_shift_form(self, driver_id, shift_day, start_time, end_time):
         self.driver.get(BASE_URL + "/shifts")
@@ -69,35 +102,26 @@ class DriverRosterTests(unittest.TestCase):
         )
         driver_select.select_by_value(str(driver_id))
 
-        date_input = self.driver.find_element(By.ID, "shiftDate")
-        self.driver.execute_script(
-            """
-            const input = arguments[0];
-            input.value = arguments[1];
-            input.dispatchEvent(new Event('input', {bubbles: true}));
-            input.dispatchEvent(new Event('change', {bubbles: true}));
-            """,
-            date_input,
-            shift_day
-        )
-
+        self.set_input_value("shiftDate", shift_day)
         self.set_time("startTime", start_time)
         self.set_time("endTime", end_time)
 
     def submit_shift(self):
-        self.driver.find_element(
-            By.XPATH,
-            "//button[@type='submit' and normalize-space()='Schedule Shift']"
-        ).click()
+        self.submit_form_and_wait("//form[@action='/shifts']")
 
     def test_home_page_loads(self):
         self.driver.get(BASE_URL + "/")
+
         self.wait.until(lambda d: d.title.strip() != "")
-        self.assertEqual(self.driver.title.strip(), "Driver Shift Roster")
+        self.assertEqual(
+            self.driver.title.strip(),
+            "Driver Shift Roster",
+        )
         print("PASS: Home page loaded")
 
     def test_drivers_page_loads(self):
         self.driver.get(BASE_URL + "/drivers")
+
         self.wait.until(
             EC.visibility_of_element_located((By.TAG_NAME, "h1"))
         )
@@ -106,6 +130,7 @@ class DriverRosterTests(unittest.TestCase):
 
     def test_shifts_page_loads(self):
         self.driver.get(BASE_URL + "/shifts")
+
         self.wait.until(
             EC.presence_of_element_located((By.ID, "driverId"))
         )
@@ -115,99 +140,149 @@ class DriverRosterTests(unittest.TestCase):
     def test_register_driver(self):
         self.driver.get(BASE_URL + "/drivers")
 
-        unique_phone = "8" + str(int(time.time()))[-9:]
-        driver_name = "Selenium Test Driver " + str(int(time.time()))
+        timestamp = str(time.time_ns())
+        driver_name = "Selenium Test Driver " + timestamp
+        unique_phone = "8" + str(time.time_ns())[-9:]
 
         self.wait.until(
             EC.visibility_of_element_located((By.ID, "name"))
         ).send_keys(driver_name)
+
         self.driver.find_element(By.ID, "phone").send_keys(unique_phone)
 
-        self.driver.find_element(
-            By.XPATH,
-            "//button[@type='submit' and normalize-space()='Add Driver']"
-        ).click()
+        self.submit_form_and_wait("//form[@action='/drivers']")
 
-        self.wait.until(
-            EC.text_to_be_present_in_element(
-                (By.TAG_NAME, "body"), driver_name
-            )
+        page_text = self.get_page_message()
+
+        self.assertIn(
+            driver_name,
+            page_text,
+            "Driver registration failed. Page content:\n" + page_text,
         )
-        self.assertIn(unique_phone, self.driver.page_source)
+        self.assertIn(unique_phone, page_text)
         print("PASS: Driver registration works")
 
     def test_toggle_driver_availability(self):
         self.driver.get(BASE_URL + "/drivers")
-        driver_name = "Selenium Test Driver"
 
-        rows = self.driver.find_elements(
-            By.XPATH,
-            f"//tr[td[starts-with(normalize-space(), '{driver_name}')] and td[5]//button]"
+        rows = self.wait.until(
+            EC.presence_of_all_elements_located(
+                (By.XPATH, "//table//tbody/tr[td]")
+            )
         )
-        self.assertTrue(rows, "No Selenium test driver found")
 
-        row = rows[-1]
-        old_status = row.find_element(By.XPATH, "./td[4]").text.strip()
-        row.find_element(By.XPATH, ".//button[@type='submit']").click()
+        target_row = None
 
-        self.wait.until(
-            lambda d: d.find_element(
-                By.XPATH,
-                f"//tr[td[starts-with(normalize-space(), '{driver_name}')]][last()]/td[4]"
-            ).text.strip() != old_status
+        for row in reversed(rows):
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if (
+                len(cells) >= 5
+                and "Selenium Test Driver" in cells[1].text
+            ):
+                target_row = row
+                break
+
+        self.assertIsNotNone(
+            target_row,
+            "No Selenium test driver found in the driver table.",
         )
+
+        cells = target_row.find_elements(By.TAG_NAME, "td")
+        old_status = cells[3].text.strip()
+
+        target_row.find_element(
+            By.XPATH, ".//form//button[@type='submit']"
+        ).click()
+
+        def status_changed(driver):
+            try:
+                current_rows = driver.find_elements(
+                    By.XPATH, "//table//tbody/tr[td]"
+                )
+
+                for row in reversed(current_rows):
+                    cells = row.find_elements(By.TAG_NAME, "td")
+
+                    if (
+                        len(cells) >= 5
+                        and "Selenium Test Driver" in cells[1].text
+                        and cells[3].text.strip() != old_status
+                    ):
+                        return cells[3].text.strip()
+
+                return False
+            except Exception:
+                return False
+
+        new_status = self.wait.until(status_changed)
+        self.assertIn(new_status, ("Available", "Unavailable"))
         print("PASS: Driver availability toggle works")
 
     def test_schedule_shift(self):
         driver_id = self.find_available_driver_id()
-        shift_day = (date.today() + timedelta(days=30)).isoformat()
+
+        # Use a future date and a separate time slot.
+        shift_day = (date.today() + timedelta(days=90)).isoformat()
 
         self.fill_shift_form(
-            driver_id, shift_day, "09:00", "10:00"
+            driver_id,
+            shift_day,
+            "03:00",
+            "04:00",
         )
         self.submit_shift()
 
-        self.wait.until(
-            EC.text_to_be_present_in_element(
-                (By.TAG_NAME, "body"),
-                "Shift scheduled successfully!"
-            )
+        page_text = self.get_page_message()
+
+        self.assertIn(
+            "Shift scheduled successfully!",
+            page_text,
+            "Shift scheduling failed. Page content:\n" + page_text,
         )
-        self.assertIn(shift_day, self.driver.page_source)
-        print("PASS: Shift scheduled successfully")
+        self.assertIn(shift_day, page_text)
+        print("PASS: Shift scheduling works")
 
     def test_overlapping_shift_is_rejected(self):
-        # Create a fresh date so the first shift is unlikely to conflict
-        # with existing records.
         driver_id = self.find_available_driver_id()
-        shift_day = (date.today() + timedelta(days=60)).isoformat()
 
-        # First shift: 09:00–10:00.
+        # Use a different date from the ordinary scheduling test.
+        shift_day = (date.today() + timedelta(days=91)).isoformat()
+
         self.fill_shift_form(
-            driver_id, shift_day, "09:00", "10:00"
+            driver_id,
+            shift_day,
+            "03:00",
+            "04:00",
         )
         self.submit_shift()
 
-        self.wait.until(
-            EC.text_to_be_present_in_element(
-                (By.TAG_NAME, "body"),
-                "Shift scheduled successfully!"
-            )
+        first_response = self.get_page_message()
+
+        self.assertIn(
+            "Shift scheduled successfully!",
+            first_response,
+            "The first shift was not created. Page content:\n"
+            + first_response,
         )
 
-        # Second shift overlaps the first by 30 minutes.
+        # Overlap the first shift by 30 minutes.
         self.fill_shift_form(
-            driver_id, shift_day, "09:30", "10:30"
+            driver_id,
+            shift_day,
+            "03:30",
+            "04:30",
         )
         self.submit_shift()
 
-        self.wait.until(
-            EC.text_to_be_present_in_element(
-                (By.TAG_NAME, "body"),
-                "This driver already has a shift during that time."
-            )
+        second_response = self.get_page_message()
+
+        self.assertIn(
+            "This driver already has a shift during that time.",
+            second_response,
+            "The overlapping shift was not rejected. Page content:\n"
+            + second_response,
         )
-        print("PASS: Overlapping shift rejected successfully")
+        print("PASS: Overlapping shift rejected")
 
 
 if __name__ == "__main__":

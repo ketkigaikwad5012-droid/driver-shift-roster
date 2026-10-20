@@ -44,3 +44,10 @@ application-local.properties
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Local packaged JAR outside target
+/driver-shift-roster-0.0.1-SNAPSHOT.jar
