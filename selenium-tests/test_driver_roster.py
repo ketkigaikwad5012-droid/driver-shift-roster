@@ -9,8 +9,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 
+import os
 
-BASE_URL = "http://localhost:8082"
+BASE_URL = os.environ.get("BASE_URL", "http://localhost:8082")
 
 
 class DriverRosterTests(unittest.TestCase):
