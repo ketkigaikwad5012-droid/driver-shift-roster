@@ -51,3 +51,10 @@ __pycache__/
 
 # Local packaged JAR outside target
 /driver-shift-roster-0.0.1-SNAPSHOT.jar
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Generated Java application artifact
+/app.jar
