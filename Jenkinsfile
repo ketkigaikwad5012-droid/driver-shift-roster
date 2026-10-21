@@ -19,7 +19,7 @@ pipeline {
                 checkout scm
             }
         }
-        
+
         stage('Check Docker Access') {
             steps {
                 bat 'whoami'
@@ -27,7 +27,6 @@ pipeline {
                 bat 'docker info'
             }
         }
-
 
         stage('Build and Test') {
             steps {
@@ -80,16 +79,16 @@ pipeline {
                 '''
             }
         }
-    }
 
-    
         stage('Build Docker Image') {
             steps {
                 bat '''
                 docker build --pull -t driver-shift-roster:%BUILD_NUMBER% .
                 if errorlevel 1 exit /b 1
+
                 docker tag driver-shift-roster:%BUILD_NUMBER% driver-shift-roster:latest
                 if errorlevel 1 exit /b 1
+
                 docker image inspect driver-shift-roster:%BUILD_NUMBER%
                 if errorlevel 1 exit /b 1
                 '''
@@ -105,6 +104,7 @@ pipeline {
                 )
 
                 docker rm -f driver-shift-roster-jenkins 2>NUL
+
                 docker run -d --name driver-shift-roster-jenkins -p 8085:8081 -e DB_USERNAME=root -e "DB_PASSWORD=%DB_PASSWORD%" -e SPRING_DATASOURCE_URL=jdbc:mysql://host.docker.internal:3306/driver_shift_roster driver-shift-roster:%BUILD_NUMBER%
                 if errorlevel 1 exit /b 1
 
@@ -113,7 +113,7 @@ pipeline {
                 '''
             }
         }
-
+    }
 
     post {
         always {
@@ -124,7 +124,7 @@ pipeline {
         }
 
         success {
-            echo 'Build, Java tests, packaging and Selenium tests completed successfully.'
+            echo 'Build, Java tests, Selenium tests, Docker image build and deployment completed successfully.'
         }
 
         failure {
