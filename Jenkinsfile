@@ -19,6 +19,15 @@ pipeline {
                 checkout scm
             }
         }
+        
+        stage('Check Docker Access') {
+            steps {
+                bat 'whoami'
+                bat 'docker version'
+                bat 'docker info'
+            }
+        }
+
 
         stage('Build and Test') {
             steps {
