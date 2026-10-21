@@ -1,0 +1,7 @@
+project_name: driver-shift-roster
+deployment_dir: /mnt/d/driver-shift-roster/ansible/deployment
+docker_image: driver-shift-roster:ansible
+container_name: driver-shift-roster-ansible
+container_port: 8081
+host_port: 8086
+health_url: http://localhost:8086/drivers

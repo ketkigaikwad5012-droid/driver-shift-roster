@@ -1,0 +1,70 @@
+---
+- name: Configure and deploy Driver Shift Roster
+  hosts: deployment
+  gather_facts: true
+
+  tasks:
+    - name: Verify required deployment tools are installed
+      ansible.builtin.command: "{{ item }} --version"
+      loop:
+        - docker
+        - ansible
+      changed_when: false
+
+    - name: Verify Docker daemon is reachable
+      ansible.builtin.command: docker info
+      changed_when: false
+
+    - name: Create deployment directory
+      ansible.builtin.file:
+        path: "{{ deployment_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Verify application JAR exists
+      ansible.builtin.stat:
+        path: /mnt/d/driver-shift-roster/target/driver-shift-roster-0.0.1-SNAPSHOT.jar
+      register: application_jar
+
+    - name: Stop if application JAR is missing
+      ansible.builtin.assert:
+        that:
+          - application_jar.stat.exists
+          - application_jar.stat.isreg
+        fail_msg: "Build the Spring Boot application before running this playbook."
+
+    - name: Build Docker image
+      community.docker.docker_image:
+        name: "{{ docker_image }}"
+        source: build
+        build:
+          path: /mnt/d/driver-shift-roster
+        force_source: false
+
+    - name: Run application container
+      no_log: true
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ docker_image }}"
+        state: started
+        restart_policy: unless-stopped
+        published_ports:
+          - "{{ host_port }}:{{ container_port }}"
+        env:
+          DB_USERNAME: root
+          DB_PASSWORD: "{{ lookup('env', 'DB_PASSWORD') }}"
+          SPRING_DATASOURCE_URL: "jdbc:mysql://host.docker.internal:3306/driver_shift_roster"
+        comparisons:
+          image: strict
+          env: strict
+
+    - name: Wait for application health endpoint
+      ansible.builtin.uri:
+        url: "{{ health_url }}"
+        method: GET
+        status_code: 200
+      register: health_result
+      retries: 12
+      delay: 5
+      until: health_result.status | default(0) == 200
+      when: not ansible_check_mode
