@@ -82,6 +82,39 @@ pipeline {
         }
     }
 
+    
+        stage('Build Docker Image') {
+            steps {
+                bat '''
+                docker build --pull -t driver-shift-roster:%BUILD_NUMBER% .
+                if errorlevel 1 exit /b 1
+                docker tag driver-shift-roster:%BUILD_NUMBER% driver-shift-roster:latest
+                if errorlevel 1 exit /b 1
+                docker image inspect driver-shift-roster:%BUILD_NUMBER%
+                if errorlevel 1 exit /b 1
+                '''
+            }
+        }
+
+        stage('Deploy Docker Container') {
+            steps {
+                bat '''
+                if not defined DB_PASSWORD (
+                    echo ERROR: DB_PASSWORD is not configured in Jenkins.
+                    exit /b 1
+                )
+
+                docker rm -f driver-shift-roster-jenkins 2>NUL
+                docker run -d --name driver-shift-roster-jenkins -p 8085:8081 -e DB_USERNAME=root -e "DB_PASSWORD=%DB_PASSWORD%" -e SPRING_DATASOURCE_URL=jdbc:mysql://host.docker.internal:3306/driver_shift_roster driver-shift-roster:%BUILD_NUMBER%
+                if errorlevel 1 exit /b 1
+
+                powershell -NoProfile -ExecutionPolicy Bypass -Command "$ready = $false; for ($i = 0; $i -lt 60; $i++) { try { $r = Invoke-WebRequest -Uri 'http://localhost:8085/drivers' -UseBasicParsing -TimeoutSec 3; if ($r.StatusCode -eq 200) { $ready = $true; break } } catch {}; Start-Sleep -Seconds 2 }; if (-not $ready) { docker logs --tail 80 driver-shift-roster-jenkins; exit 1 }; Write-Host 'Docker deployment health check passed.'"
+                if errorlevel 1 exit /b 1
+                '''
+            }
+        }
+
+
     post {
         always {
             echo 'Cleaning up the CI test application, if it was started.'
